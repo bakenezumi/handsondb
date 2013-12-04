@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" >
+<head>
+    <title>jb project</title>
+
+    <link rel="shortcut icon" type="image/png" href="../images/favicon.png">
+
+    <link rel="stylesheet" media="screen" href="../stylesheets/select2.css"/>
+    <link rel="stylesheet" media="screen" href="../stylesheets/bootmetro.css"/>
+    <link rel="stylesheet" media="screen" href="../stylesheets/bootmetro-icons.css"/>
+    <link rel="stylesheet" media="screen" href="../stylesheets/bootmetro-ui-light.css"/>
+    <link rel="stylesheet" media="screen" href="../stylesheets/bootmetro-responsive.css"/> 
+    <link rel="stylesheet" media="screen" href="../stylesheets/datepicker.css"/>
+    <link rel="stylesheet" media="screen" href="../stylesheets/jquery.handsontable.css"/>
+    <link rel="stylesheet" media="screen" href="../stylesheets/main.css"/>
+    
+    <script src="../javascripts/jquery-1.10.2.min.js" type="text/javascript"></script>
+    <script src="../javascripts/jquery.form.js" type="text/javascript"></script>
+    <script src="../javascripts/jquery.validate.min.js" type="text/javascript"></script>
+    <script src="../javascripts/jquery.blockUI.js" type="text/javascript"></script>
+    <script src="../javascripts/select2.js" type="text/javascript"></script>
+    <script src="../javascripts/bootstrap.min.js" type="text/javascript"></script>
+    <script src="../javascripts/bootstrap-datepicker.js" type="text/javascript"></script>
+    <script src="../javascripts/bootstrap-datepicker.ja.js" type="text/javascript"></script>
+    <script src="../javascripts/jquery.handsontable.js" type="text/javascript"></script>
+    <script src="../javascripts/numeral.js" type="text/javascript"></script>
+    
+  <style type="text/css">body { visibility: hidden; }</style>
+    
+<script type="text/javascript"> 
+<!-- 
+    jQuery.extend(jQuery.validator.defaults, {
+        onkeyup: false,
+        onfocusout: false,
+        ignore: "",
+    });
+    
+    jQuery.extend({
+       defaultAjaxErrorHandler : function(err) {
+           alert("error!" + err.responseText);
+       },
+    });
+        
+    $(function(){
+        
+          var frm = $('#form1');
+          frm.attr("action","/init");
+          frm.ajaxSubmit({
+            success: function(data) {
+                var obj = JSON.parse(data);
+                var tnames = [], i;
+                for (i = 0; i < obj.tnames.length; i++) {
+                    tnames.push({id: obj.tnames[i], text: obj.tnames[i]});
+                }
+                $("#tname").select2({
+                    placeholder: "",
+                    data: tnames
+                });
+                $("#tname").on("change", function(e) {
+                    $.ajax({
+                        type: 'GET',
+                        url: '/get_table',
+                        data: {
+                            tname: e.val,
+                        },
+                        dataType: 'json',
+                        success: function(table_data) {
+                            showTable(table_data)
+                        },
+                        error: $.defaultAjaxErrorHandler,
+                        complete: function() {
+                        }
+                    });
+                });
+            },
+            error: $.defaultAjaxErrorHandler,
+            complete: function(){
+                $("body").css({ visibility: "visible" });
+            }
+        });
+                
+      $("#submit").click(function(){
+            console.log($("#tname").val());
+            console.log($('#table1').data('handsontable').getData());
+            errCount = $(".htInvalid").length;
+            if(errCount) {
+                var s = "";
+                if(errCount > 1) s = "s";
+                alert("Please correct the input error [" + errCount + "place" + s + "]");
+                return;
+            }
+            
+            var data = {
+                tname: $("#tname").val(),
+                data: $('#table1').data('handsontable').getData(),
+            };
+            console.log(JSON.stringify(data));
+            
+            $.blockUI();  
+            $.ajax({
+                type: 'POST',
+                url: '/update',
+                data: {
+                    tname: $("#tname").val(),
+                    data: JSON.stringify($('#table1').data('handsontable').getData()),
+                },
+                dataType: 'json',
+                    success: function(table_data) {
+                    alert("complete");
+                },
+                error: $.defaultAjaxErrorHandler,
+                complete: function() {
+                    setTimeout($.unblockUI,1);  
+                }
+            });
+      });
+        
+    $('#form1').validate({
+        invalidHandler: function(form, validator) {
+        },
+        submitHandler: function(form){
+        },
+    });
+        
+    })
+
+function length_validator_fn(maxlengh) { return function (value) {
+    if (value.toString().length <= maxlengh) {
+      return true;
+    }
+    else {
+      return false;
+    }
+}};
+
+var numeric_validator_fn = function(value) {
+  return /^-?\d*\.?\d*$/.test(value);
+};
+    
+function multi_validator_fn(validators) {
+    return function (value, callback) {
+        var i;
+        for(i = 0; i < validators.length ; i++) {
+            if(!validators[i](value)) {
+                callback(false);
+                return;
+            }
+        }
+        callback(true);
+    }
+}
+    
+function showTable(table_data) {
+            //detail
+            var colHeaders = new Array();
+            var columns =  new Array();
+            var colWidths =  new Array();
+            table_data.columns.forEach(function(item){
+                var validators = new Array();
+                colHeaders.push(item.data);
+                var column = {};
+                column["data"] = item.data;
+                if(item.type) {     
+                    column["type"] = item.type;
+                    if(item.type === 'numeric') {
+                        validators.push(numeric_validator_fn);
+                        column["allowInvalid"] = true;
+                    }
+                }
+                if(item.format) {
+                    column["format"] = item.format;
+                }
+                if(item.maxlength) {
+                    validators.push(length_validator_fn(item.maxlength));
+                }
+                column["validator"] = multi_validator_fn(validators);
+                columns.push(column);
+            });
+            $('#table1').handsontable({
+              data: table_data.data,
+              minRows: 2,
+              minSpareRows: 1,
+              contextMenu:{
+                  items :{
+                    "remove_row": {}
+                   }
+              },
+              columns: columns,                
+              colHeaders: colHeaders,
+              manualColumnResize: true,
+              currentRowClassName: 'currentRow',
+          });
+
+}
+-->
+</script>
+</head>
+<body>
+    <div class="container">
+        <form id="form1" name="form1" action="#" method="post">
+            <div class="row">
+                <div class="span12"><div class="row">
+                <div class="span2">
+                    <span>handsondb</span>
+                </div>
+                <div class="span1">
+                </div>
+                <div class="pull-right">
+                    <div class="span1">
+                        <button id="submit" class="btn btn-large icon-pencil-4" rel="tootlip" title="submit"></button>
+                    </div>
+                </div></div>
+                </div>
+            </div>
+            <br/>
+            <div class="row">   
+                <div class="span12">
+                    <div class="row">
+                        <input type="hidden" id="tname" class="span6"/>
+                    </div>
+                </div>
+            </div>
+            <br/>
+            <div class="row">
+                <div id="table1" class="span12" style=" height: 400px; overflow: scroll"></div>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
